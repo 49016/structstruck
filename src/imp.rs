@@ -494,17 +494,27 @@ fn strike_through_attributes(
 }
 
 fn report_strikethrough_deprecated(ret: &mut TokenStream, span: Span) {
+    let f = "strikethrough_used";
+    let msg = "The strikethrough attribute is depcrecated. Use structstruck::each instead.";
+    report_warning(ret, span, f, msg);
+}
+
+fn report_warning(ret: &mut TokenStream, span: Span, f: &str, msg: &str) {
     // stolen from proc-macro-warning, which depends on syn
+    let f = TokenTree::Ident(Ident::new(f, span));
     let q = quote_spanned!(span =>
-        #[allow(dead_code)]
-        #[allow(non_camel_case_types)]
-        #[allow(non_snake_case)]
-        fn strikethrough_used() {
-            #[deprecated(note = "The strikethrough attribute is depcrecated. Use structstruck::each instead.")]
-            #[allow(non_upper_case_globals)]
-            const _w: () = ();
-            let _ = _w;
-        }
+        const _: () = {
+            #[allow(dead_code)]
+            #[allow(non_camel_case_types)]
+            #[allow(non_snake_case)]
+            fn structstruck() {
+                #[deprecated(note = #msg)]
+                #[allow(non_upper_case_globals)]
+                const #f: () = ();
+                let _ = #f;
+            }
+            ()
+        };
     );
     q.to_tokens(ret);
 }
