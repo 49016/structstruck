@@ -387,7 +387,8 @@ fn tuple_struct_fields(
         // Slight hack for tuple structs:
         // struct Foo(pub struct Bar()); is ambigous:
         // Which does the pub belong to, Bar or Foo::0?
-        // I'd say Bar, but venial parses the pub as the visibility specifier of the current struct field
+        // I'd say Bar. Doesn't make much sense to make the field public but not its type.
+        // Yet, venial parses the pub as the visibility specifier of the current struct field
         // So, transfer the visibility specifier to the declaration token stream, but only if there isn't already one:
         // I also don't want to break struct Foo(pub pub struct Bar()); (both Bar and Foo::0 public)
         let vtok;
@@ -407,6 +408,20 @@ fn tuple_struct_fields(
                 None => ttok,
             },
         };
+        // The same ambiguity as for pub exists for attributes. Comparing to pub:
+        // - same: venial parses them onto the field
+        // - same: having attributes on the field is just as possible as on the type.
+        // - different: field and type each could have two or more attributes, so we can't go by count
+        // - different: you can specify attributes from inside the type with #!…
+        // - weird: derive attributes can't be on fields
+        // I don't want to special-case too deeply, so I'll warn about #[derive…] but do nothing
+        let drv_attr = field
+            .attributes
+            .iter()
+            .find(|att| matches!(&att.path[..], [TokenTree::Ident(drv)] if drv == "derive"));
+        if let Some(drv_attr) = drv_attr {
+            report_error(Some(drv_attr.path[0].span()), ret, "Attributes on tuple members are kept on the tuple member. Use an inner attribute inside the type: #![derive(…)].");
+        }
         let name_hint = path.get_name_hint(Some(num), span);
         recurse_through_type_list(
             &ttok,

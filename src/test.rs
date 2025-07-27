@@ -1098,3 +1098,34 @@ fn skip() {
     };
     check(from, out);
 }
+
+// This is a negative example on why I can't just move attributes out of tuples
+#[test]
+fn issue_15() {
+    let from = quote! {
+        struct Foo(i32, #[serde(skip_serializing)] struct Bar(i32), i32);
+    };
+    let out = quote! {
+        struct Bar(i32);
+        struct Foo(i32, #[serde(skip_serializing)] Bar, i32);
+    };
+    check(from, out);
+}
+
+#[test]
+fn issue_15_warning() {
+    let out = quote! {
+        enum Foo {
+            Child2(
+                #[derive(Debug)]
+                pub struct Child2Inner {
+                    opt2: Bar
+                }
+            )
+        }
+    };
+    let mut rout = Default::default();
+    recurse_through_definition(out, vec![], false, &mut rout);
+    let out = dbg!(rout.to_string());
+    assert!(out.contains("inner attribute"));
+}
