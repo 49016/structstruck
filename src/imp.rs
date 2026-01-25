@@ -673,14 +673,38 @@ fn un_type_tree(
                     type_ret.push(TokenTree::Punct((*c).clone()));
                 }
             }
-            TypeTree::Token(t) => type_ret.push((*t).clone()),
+            TypeTree::Array(t, c) => {
+                let mut itr = Vec::new();
+                f(t, &mut itr);
+                if let Some(c) = c {
+                    itr.push(TokenTree::Punct(Punct::new(';', Spacing::Joint)));
+                    un_type_length_tree(&mut itr, c);
+                }
+                let g = Group::new(Delimiter::Bracket, itr.into_iter().collect());
+                type_ret.push(TokenTree::Group(g));
+            }
+            TypeTree::Token(t) => {
+                type_ret.push((*t).clone());
+            }
         }
     }
+}
+
+fn un_type_length_tree(itr: &mut Vec<TokenTree>, c: &&[TypeTree<'_>]) {
+    un_type_tree(c, itr, |ttt, type_ret| {
+        for tt in ttt {
+            match tt {
+                TypeTree::Token(token_tree) => type_ret.push((*token_tree).clone()),
+                _ => todo!("Nee lass ma"),
+            }
+        }
+    });
 }
 
 #[cfg_attr(test, derive(Debug))]
 pub(crate) enum TypeTree<'a> {
     Group(&'a Punct, Vec<TypeTree<'a>>, Option<&'a Punct>),
+    Array(&'a [TypeTree<'a>], Option<&'a [TypeTree<'a>]>),
     Token(&'a TokenTree),
 }
 
@@ -700,6 +724,23 @@ pub(crate) fn type_tree<'a>(args: &'a [TokenTree], ret: &'_ mut TokenStream) -> 
                     report_error(Some(close.span()), ret, "Unexpected >");
                     current.push(TypeTree::Token(tt));
                 }
+            }
+            TokenTree::Group(group) if matches!(group.delimiter(), Delimiter::Bracket) => {
+                let inner = group.stream().into_iter().collect::<Vec<_>>().leak();
+                let tt = type_tree(inner, ret).leak();
+                let mut ct = tt.rsplitn(
+                    2,
+                    |d| matches!(d, TypeTree::Token(TokenTree::Punct(p)) if p.as_char() == ';' ),
+                ).collect::<Vec<_>>();
+                ct.reverse();
+                let (t, c) = match &ct[..] {
+                    &[t, c] => (t, Some(c)),
+                    &[t] => (t, None),
+                    &[] => (&[][..], None),
+                    _ => unreachable!(),
+                };
+
+                current.push(TypeTree::Array(t, c));
             }
             tt => current.push(TypeTree::Token(tt)),
         }

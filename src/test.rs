@@ -292,6 +292,7 @@ fn type_tree_parsing() {
                     TokenTree::Group(Group::new(Delimiter::Parenthesis, tost(s)))
                 }
                 TypeTree::Token(t) => t.clone(),
+                TypeTree::Array(_type_trees, _span) => unreachable!(),
             })
             .collect()
     }
@@ -1128,4 +1129,23 @@ fn issue_15_warning() {
     recurse_through_definition(out, vec![], false, &mut rout);
     let out = dbg!(rout.to_string());
     assert!(out.contains("inner attribute"));
+}
+
+#[test]
+fn issue_13_array() {
+    let from = quote! {
+        pub struct Config {
+            input_uid: [struct { name: String}; 3],
+            output_uid: Vec<struct {name: String}>,
+        }
+    };
+    let out = quote! {
+        struct InputUid { name: String }
+        struct OutputUid { name: String }
+        pub struct Config {
+            input_uid: [InputUid; 3],
+            output_uid: Vec<OutputUid>,
+        }
+    };
+    check(from, out);
 }
