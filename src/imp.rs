@@ -678,7 +678,7 @@ fn un_type_tree(
                 f(t, &mut itr);
                 if let Some(c) = c {
                     itr.push(TokenTree::Punct(Punct::new(';', Spacing::Joint)));
-                    un_type_length_tree(&mut itr, c);
+                    un_tree_type(c, &mut itr);
                 }
                 let g = Group::new(Delimiter::Bracket, itr.into_iter().collect());
                 type_ret.push(TokenTree::Group(g));
@@ -688,17 +688,6 @@ fn un_type_tree(
             }
         }
     }
-}
-
-fn un_type_length_tree(itr: &mut Vec<TokenTree>, c: &&[TypeTree<'_>]) {
-    un_type_tree(c, itr, |ttt, type_ret| {
-        for tt in ttt {
-            match tt {
-                TypeTree::Token(token_tree) => type_ret.push((*token_tree).clone()),
-                _ => todo!("Nee lass ma"),
-            }
-        }
-    });
 }
 
 #[cfg_attr(test, derive(Debug))]
