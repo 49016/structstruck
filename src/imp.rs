@@ -591,7 +591,7 @@ fn recurse_through_type(
             );
         }
         let mut decl = Vec::new();
-        un_tree_type(tok, &mut decl);
+        un_tree_type(tok, ret, &mut decl);
         let pos = decl
             .iter()
             .position(|t| matches!(t, TokenTree::Ident(kw) if is_decl_kw(kw)))
@@ -642,7 +642,7 @@ fn recurse_through_type(
             type_ret.push(generics.tk_r_bracket.into());
         }
     } else {
-        un_type_tree(tok, type_ret, |g, type_ret| {
+        un_type_tree(tok, ret, type_ret, |g, ret, type_ret| {
             recurse_through_type_list(g, strike_attrs, ret, name_hint, false, type_ret, path)
         });
     }
@@ -655,37 +655,40 @@ fn get_decl_ident<'a>(t: &'a TypeTree) -> Option<&'a Ident> {
     }
 }
 
-fn un_tree_type(tok: &[TypeTree], type_ret: &mut Vec<TokenTree>) {
-    un_type_tree(tok, type_ret, un_tree_type)
+fn un_tree_type(tok: &[TypeTree], ret: &mut TokenStream, type_ret: &mut Vec<TokenTree>) {
+    un_type_tree(tok, ret, type_ret, un_tree_type)
 }
 
 fn un_type_tree(
     tok: &[TypeTree],
+    ret: &mut TokenStream,
     type_ret: &mut Vec<TokenTree>,
-    mut f: impl FnMut(&[TypeTree], &mut Vec<TokenTree>),
+    mut f: impl FnMut(&[TypeTree], &mut TokenStream, &mut Vec<TokenTree>),
 ) {
     for tt in tok.iter() {
         match tt {
             TypeTree::Group(o, g, c) => {
                 type_ret.push(TokenTree::Punct((*o).clone()));
-                f(g, type_ret);
+                f(g, ret, type_ret);
                 if let Some(c) = c {
                     type_ret.push(TokenTree::Punct((*c).clone()));
                 }
             }
-            TypeTree::Array(t, c) => {
+            TypeTree::Token(TokenTree::Group(g)) if matches!(g.delimiter(), Delimiter::Bracket) => {
+                let inner = g.stream().into_iter().collect::<Vec<_>>();
+                let tt = type_tree(&inner, ret);
+                let ct = tt.splitn(
+                    2,
+                    |d| matches!(d, TypeTree::Token(TokenTree::Punct(p)) if p.as_char() == ';' ),
+                ).collect::<Vec<_>>();
+                let t = ct.get(0).map_or(&[][..], |&v| v);
                 let mut itr = Vec::new();
-                f(t, &mut itr);
-                if let Some(c) = c {
-                    itr.push(TokenTree::Punct(Punct::new(';', Spacing::Joint)));
-                    un_tree_type(c, &mut itr);
-                }
+                f(t, ret, &mut itr);
+                un_tree_type(&tt[t.len()..], ret, &mut itr);
                 let g = Group::new(Delimiter::Bracket, itr.into_iter().collect());
                 type_ret.push(TokenTree::Group(g));
             }
-            TypeTree::Token(t) => {
-                type_ret.push((*t).clone());
-            }
+            TypeTree::Token(t) => type_ret.push((*t).clone()),
         }
     }
 }
@@ -693,7 +696,6 @@ fn un_type_tree(
 #[cfg_attr(test, derive(Debug))]
 pub(crate) enum TypeTree<'a> {
     Group(&'a Punct, Vec<TypeTree<'a>>, Option<&'a Punct>),
-    Array(&'a [TypeTree<'a>], Option<&'a [TypeTree<'a>]>),
     Token(&'a TokenTree),
 }
 
@@ -713,23 +715,6 @@ pub(crate) fn type_tree<'a>(args: &'a [TokenTree], ret: &'_ mut TokenStream) -> 
                     report_error(Some(close.span()), ret, "Unexpected >");
                     current.push(TypeTree::Token(tt));
                 }
-            }
-            TokenTree::Group(group) if matches!(group.delimiter(), Delimiter::Bracket) => {
-                let inner = group.stream().into_iter().collect::<Vec<_>>().leak();
-                let tt = type_tree(inner, ret).leak();
-                let mut ct = tt.rsplitn(
-                    2,
-                    |d| matches!(d, TypeTree::Token(TokenTree::Punct(p)) if p.as_char() == ';' ),
-                ).collect::<Vec<_>>();
-                ct.reverse();
-                let (t, c) = match &ct[..] {
-                    &[t, c] => (t, Some(c)),
-                    &[t] => (t, None),
-                    &[] => (&[][..], None),
-                    _ => unreachable!(),
-                };
-
-                current.push(TypeTree::Array(t, c));
             }
             tt => current.push(TypeTree::Token(tt)),
         }

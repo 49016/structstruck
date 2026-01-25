@@ -292,7 +292,6 @@ fn type_tree_parsing() {
                     TokenTree::Group(Group::new(Delimiter::Parenthesis, tost(s)))
                 }
                 TypeTree::Token(t) => t.clone(),
-                TypeTree::Array(_type_trees, _span) => unreachable!(),
             })
             .collect()
     }
@@ -1145,6 +1144,36 @@ fn issue_13_array() {
         pub struct Config {
             input_uid: [InputUid; 3],
             output_uid: Vec<OutputUid>,
+        }
+    };
+    check(from, out);
+}
+
+// Still gotta do something sane even if it's bork
+#[test]
+fn array_degraded() {
+    let from = quote! {
+        pub struct Config {
+            empty: [],
+            justa: [a],
+            nolen: [struct {}],
+            elen: [struct {};],
+            mlen: [struct {};3;3],
+            goodslice: &'a [struct {}],
+        }
+    };
+    let out = quote! {
+        struct Nolen {}
+        struct Elen {}
+        struct Mlen {}
+        struct Goodslice {}
+        pub struct Config {
+            empty: [],
+            justa: [a],
+            nolen: [Nolen],
+            elen: [Elen;],
+            mlen: [Mlen;3;3],
+            goodslice: &'a [Goodslice],
         }
     };
     check(from, out);
