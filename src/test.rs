@@ -1178,3 +1178,24 @@ fn array_degraded() {
     };
     check(from, out);
 }
+
+#[test]
+fn here_each() {
+    let from = quote! {
+        #[structstruck::each[B]]
+        #[structstruck::each[C]]
+
+        #[A]
+        #[structstruck::here_each]
+        #[D]
+        struct X {}
+    };
+    let out = quote! {
+        #[A]
+        #[B]
+        #[C]
+        #[D]
+        struct X {}
+    };
+    check(from, out);
+}

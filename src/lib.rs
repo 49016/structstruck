@@ -202,9 +202,9 @@
 //! The behavior of `each` can be influenced in three ways:
 //!  * `structstruck::skip_each` will ignore any attributes in `each` for the current struct only.
 //!  * `structstruck::clear_each` will ignore any `structstruck::each` from parent structs for the current struct and children.
-//! *  `structstruck::here_each` will set the position of the items inserted with `structstruck::each` in case order matters.
+//!  * `structstruck::here_each` will set the position of the items inserted with `structstruck::each` if attribute order matters.
 //!
-//! The order of attributes does not matter.
+//! The order of attributes (except for here_each) does not matter.
 //!
 //! For example:
 //! ```no_run
