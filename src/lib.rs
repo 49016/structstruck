@@ -199,9 +199,10 @@
 //! println!("{:#?}", Parent { ..todo!("value skipped for brevity") });
 //! ```
 //!
-//! The behavior of `each` can be influenced in two ways:
+//! The behavior of `each` can be influenced in three ways:
 //!  * `structstruck::skip_each` will ignore any attributes in `each` for the current struct only.
 //!  * `structstruck::clear_each` will ignore any `structstruck::each` from parent structs for the current struct and children.
+//! *  `structstruck::here_each` will set the position of the items inserted with `structstruck::each` in case order matters.
 //!
 //! The order of attributes does not matter.
 //!
@@ -222,6 +223,19 @@
 //! # fn foo() { A.unwrap().b; }
 //! ```
 //! will place no attributes on `B` and only `allow(unused)` on `C`.
+//!
+//! ```no_run
+//! strike!(
+//!     #[structstruck::each[B]]
+//!     #[structstruck::each[C]]
+//!
+//!     #[A]
+//!     #[structstruck::here_each]
+//!     #[D]
+//!     struct X {}
+//! );
+//! ```
+//! will place the attributes `#[A] #[B] #[C] #[D]` in that order.
 //!
 //! #### Avoiding name collisions
 //! If you want include the parent struct name (or parent enum name and variant name)
